@@ -1,95 +1,165 @@
 import { Resolver } from 'node:dns/promises'
 import * as childprocess from 'node:child_process'
-import fs from 'fs';
+import { stdout } from 'node:process'
+import fs from 'fs'
 import util from 'node:util'
 
 const exec = util.promisify(childprocess.exec)
 
+async function getDNSList (args) {
+  let dns = ["1.1.1.1", "4.4.4.4", "223.5.5.5", "223.6.6.6", "114.114.114.114", "8.8.4.4", "8.8.8.8"]
+  const dnsFilePath = new URL('./dns.json', import.meta.url)
 
-export default async (arr) => {
-
-    const url = arr[0];
-    const host = new URL(url).host;
-    let dns = []
-    const dnsFilePath = new URL('./dns.json', import.meta.url);
-
-
-    if (fs.existsSync(dnsFilePath) && arr.indexOf('--disable-dns-cache') === -1) {
-        console.log('Use DNS cache, add --disable-dns-cache to refresh.')
-        dns = JSON.parse(String(fs.readFileSync(dnsFilePath)));
-    } else {
-        let list = []
-        const urls = [
-            'https://public-dns.info/nameserver/sg.json',
-            'https://public-dns.info/nameserver/cn.json',
-            'https://public-dns.info/nameserver/am.json',
-            'https://public-dns.info/nameserver/jp.json',
-            'https://public-dns.info/nameserver/fr.json'
-        ]
-        for (let i = 0; i < urls.length; i++) {
-            list = list.concat(
-                (await fetch(urls[i]).then(d => d.json())).map(t => t.ip)
-            )
-        }
-
-        dns = Array.from(new Set(list))
-
-        fs.writeFileSync(dnsFilePath, JSON.stringify(dns, null, 2));
+  if (
+    fs.existsSync(dnsFilePath) &&
+    args.indexOf('--disable-dns-cache') === -1
+  ) {
+    console.log('Use DNS cache, add --disable-dns-cache to refresh.')
+    dns = JSON.parse(String(fs.readFileSync(dnsFilePath)))
+  } else {
+    console.log('Fetching DNS list...')
+    let list = []
+    const urls = [
+      'https://public-dns.info/nameserver/sg.json',
+      'https://public-dns.info/nameserver/cn.json',
+      'https://public-dns.info/nameserver/am.json',
+      'https://public-dns.info/nameserver/jp.json',
+      'https://public-dns.info/nameserver/fr.json',
+      'https://public-dns.info/nameserver/it.json',
+      'https://public-dns.info/nameserver/ru.json',
+      'https://public-dns.info/nameserver/hk.json',
+      'https://public-dns.info/nameserver/in.json',
+      'https://public-dns.info/nameserver/au.json'
+    ]
+    for (let i = 0; i < urls.length; i++) {
+      list = list.concat(
+        (await fetch(urls[i]).then(d => d.json())).map(t => t.ip)
+      )
     }
 
+    dns = Array.from(new Set(list))
 
-    console.log(`DNS count ${dns.length}.`);
-    console.log(`Start resolve ${host} to ips.`)
-    let ips = []
-    let ipsPromises = []
-    for (let i = 0; i < dns.length; i++) {
-        const resolver = new Resolver({ timeout: 2000, tries: 4 })
-        resolver.setServers([dns[i]])
+    fs.writeFileSync(dnsFilePath, JSON.stringify(dns, null, 2))
+  }
 
-        ipsPromises.push(
-            resolver
-                .resolve(host)
-                .then(list => {
-                    if (list && list.length > 0) {
-                        ips = ips.concat(list)
-                    }
-                })
-                .catch(err => { })
+  console.log(`DNS count ${dns.length}.`)
+  return dns
+}
+
+async function getIPs (dns, host) {
+  console.log(`Start resolve ${host} to IPs.`)
+  let ips = []
+  let ipsPromises = []
+  let dnsResolvedCount = 0
+  let dnsPushedCount = 0
+
+  function outputPush () {
+    dnsPushedCount++
+    stdout.write(
+      `Pushing...\t${dnsPushedCount}/${dns.length} ${(
+        (dnsPushedCount / dns.length) * 100
+      ).toFixed(2)}% \r`
+    )
+  }
+
+  function outputResolve () {
+    dnsResolvedCount++
+    stdout.write(
+      `Resolving...\t${dnsResolvedCount}/${dns.length} ${(
+        (dnsResolvedCount / dns.length) * 100
+      ).toFixed(2)}% \r`
+    )
+  }
+
+//   console.log('Pushing...')
+  for (let i = 0; i < dns.length; i++) {
+    const resolver = new Resolver({ timeout: 3000, tries: 3 })
+    resolver.setServers([dns[i]])
+    outputPush()
+    ipsPromises.push(
+      resolver
+        .resolve(host)
+        .then(list => {
+          if (list && list.length > 0) {
+            ips = ips.concat(list)
+          }
+        })
+        .catch(err => {})
+        .finally(() => {
+          outputResolve()
+        })
+    )
+  }
+
+  console.log('\n✅ Push done.')
+  await Promise.all(ipsPromises)
+  console.log('\n✅ Resolve done.')
+
+  ips = Array.from(new Set(ips))
+
+  console.log(`IP number ${ips.length}.`)
+  return ips
+}
+
+async function curlTest (url, host, ips) {
+  function output () {
+    testCount++
+    stdout.write(
+      `Testing...\t${testCount}/${ips.length} ${(
+        (testCount / ips.length) * 100
+      ).toFixed(2)}% \r`
+    )
+  }
+
+  let curlPromises = []
+  const start = Date.now()
+  let testCount = 0
+  let successCount = 0;
+  let successLogs = [];
+  for (let i = 0; i < ips.length; i++) {
+    curlPromises.push(
+      (ip =>
+        exec(
+          `curl -s ${url} -m 5 --resolve ${host}:443:${ip} --resolve ${host}:80:${ip}`
         )
+          .then(result => {
+              successCount++;
+            if (String(result?.stdout).length > 0) {
+              successLogs.push(`${ip}\t\tis ok,\ttime: ${Date.now() - start}`)
+            } else {
+              successLogs.push(`${ip}\t\tis zero,\ttime: ${Date.now() - start}`)
+            }
+          })
+          .catch(err => {
+            // console.log(`${ip} is error`)
+          })
+          .finally(() => {
+            output()
+          }))(ips[i])
+    )
+  }
 
-        // console.log(ips)
-    }
+  await Promise.all(curlPromises)
 
-    await Promise.all(ipsPromises)
+  console.log(`\n✅ Test done.\n`);
+  console.log(successLogs.join('\n'))
+  if (successCount > 0) {
+  console.log(`\n🎉 Curl test done. You have ${successCount} IPs available.`)
+  } else {
+    console.log(`\n✅ Curl test done. None available.`)
+  }
+}
 
-    ips = Array.from(new Set(ips))
-    // ips = ips.concat(['140.82.113.3', '20.200.245.245'])
+export default async args => {
+  // URL & Host
+  const url = args[0]
+  const host = new URL(url).host
 
-    console.log(`IP number ${ips.length}.`);
-    console.log(`Start curl test.`)
+  const dns = await getDNSList(args)
 
-    let curlPromises = []
-    const start = Date.now()
-    for (let j = 0; j < ips.length; j++) {
+  const ips = await getIPs(dns, host)
 
-        curlPromises.push(
-            !(ip =>
-                exec(
-                    `curl -s ${url} -m 5 --resolve ${host}:443:${ip} --resolve ${host}:80:${ip}`
-                )
-                    .then(result => {
-                        if (String(result?.stdout).length > 0) {
-                            console.log(`${ip} is ok, time: ${(Date.now() - start)}`)
-                        } else {
-                            console.log(`${ip} is zero, time: ${(Date.now() - start)}`)
-                        }
-                    })
-                    .catch(err => {
-                        // console.log(`${ip} is error`)
-                    }))(ips[j])
-        )
-    }
+  await curlTest(url, host, ips)
 
-    await Promise.all(curlPromises)
-    console.log('myhosts finished.')
+  console.log('All done!')
 }
