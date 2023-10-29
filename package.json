@@ -1,0 +1,15 @@
+{
+  "name": "myhosts",
+  "version": "1.0.0",
+  "description": "host",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "myhosts": "./bin/myhosts.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
