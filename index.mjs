@@ -5,8 +5,9 @@ import fs from 'fs'
 import util from 'node:util'
 
 const exec = util.promisify(childprocess.exec)
+const execSync = childprocess.execSync
 
-async function getDNSList (args) {
+async function getDNSList(args) {
   let dns = ["1.1.1.1", "4.4.4.4", "223.5.5.5", "223.6.6.6", "114.114.114.114", "8.8.4.4", "8.8.8.8"]
   const dnsFilePath = new URL('./dns.json', import.meta.url)
 
@@ -46,14 +47,14 @@ async function getDNSList (args) {
   return dns
 }
 
-async function getIPs (dns, host) {
+async function getIPs(dns, host) {
   console.log(`Start resolve ${host} to IPs.`)
   let ips = []
   let ipsPromises = []
   let dnsResolvedCount = 0
   let dnsPushedCount = 0
 
-  function outputPush () {
+  function outputPush() {
     dnsPushedCount++
     stdout.write(
       `Pushing...\t${dnsPushedCount}/${dns.length} ${(
@@ -62,7 +63,7 @@ async function getIPs (dns, host) {
     )
   }
 
-  function outputResolve () {
+  function outputResolve() {
     dnsResolvedCount++
     stdout.write(
       `Resolving...\t${dnsResolvedCount}/${dns.length} ${(
@@ -71,7 +72,7 @@ async function getIPs (dns, host) {
     )
   }
 
-//   console.log('Pushing...')
+  //   console.log('Pushing...')
   for (let i = 0; i < dns.length; i++) {
     const resolver = new Resolver({ timeout: 3000, tries: 3 })
     resolver.setServers([dns[i]])
@@ -84,7 +85,7 @@ async function getIPs (dns, host) {
             ips = ips.concat(list)
           }
         })
-        .catch(err => {})
+        .catch(err => { })
         .finally(() => {
           outputResolve()
         })
@@ -101,8 +102,8 @@ async function getIPs (dns, host) {
   return ips
 }
 
-async function curlTest (url, host, ips) {
-  function output () {
+async function curlTest(url, host, ips) {
+  function output() {
     testCount++
     stdout.write(
       `Testing...\t${testCount}/${ips.length} ${(
@@ -117,10 +118,18 @@ async function curlTest (url, host, ips) {
   let successCount = 0;
   let successLogs = [];
   for (let i = 0; i < ips.length; i++) {
+    // try {
+    //   const res = await execSync(`curl -s ${url} -m 5 --resolve ${host}:443:${ip} --resolve ${host}:80:${ip}`)
+    //   if (String(res).length > 0) {
+    //     successLogs.push(`${ip}\t\tis ok,\ttime: ${Date.now() - start}`)
+    //   } else {
+    //     successLogs.push(`${ip}\t\tis zero,\ttime: ${Date.now() - start}`)
+    //   }
+    // } catch (err) { }
     curlPromises.push(
       (ip =>
         exec(
-          `curl -s ${url} -m 5 --resolve ${host}:443:${ip} --resolve ${host}:80:${ip}`
+          `curl -s ${url} -m 10 --resolve ${host}:443:${ip} --resolve ${host}:80:${ip}`
         )
           .then(result => {
               successCount++;
@@ -144,7 +153,7 @@ async function curlTest (url, host, ips) {
   console.log(`\n✅ Test done.\n`);
   console.log(successLogs.join('\n'))
   if (successCount > 0) {
-  console.log(`\n🎉 Curl test done. You have ${successCount} IPs available.`)
+    console.log(`\n🎉 Curl test done. You have ${successCount} IPs available.`)
   } else {
     console.log(`\n✅ Curl test done. None available.`)
   }
