@@ -6,14 +6,16 @@ import util from 'node:util'
 const exec = util.promisify(childprocess.exec)
 
 
-export default async (url) => {
+export default async (arr) => {
 
-    let host = new URL(url).host;
+    const url = arr[0];
+    const host = new URL(url).host;
     let dns = []
     const dnsFilePath = new URL('./dns.json', import.meta.url);
 
 
-    if (fs.existsSync(dnsFilePath)) {
+    if (fs.existsSync(dnsFilePath) && arr.indexOf('--disable-dns-cache') === -1) {
+        console.log('Use DNS cache, add --disable-dns-cache to refresh.')
         dns = JSON.parse(String(fs.readFileSync(dnsFilePath)));
     } else {
         let list = []
@@ -36,8 +38,8 @@ export default async (url) => {
     }
 
 
-    console.log(`dns length ${dns.length}.`);
-    console.log(`start resolve ${host} to ips.`)
+    console.log(`DNS count ${dns.length}.`);
+    console.log(`Start resolve ${host} to ips.`)
     let ips = []
     let ipsPromises = []
     for (let i = 0; i < dns.length; i++) {
@@ -63,8 +65,8 @@ export default async (url) => {
     ips = Array.from(new Set(ips))
     // ips = ips.concat(['140.82.113.3', '20.200.245.245'])
 
-    console.log(`ip length ${ips.length}`);
-    console.log(`start curl test.`)
+    console.log(`IP number ${ips.length}.`);
+    console.log(`Start curl test.`)
 
     let curlPromises = []
     const start = Date.now()
@@ -73,13 +75,13 @@ export default async (url) => {
         curlPromises.push(
             !(ip =>
                 exec(
-                    `curl -s ${url} -m 5 --resolve ${host}:443:${ip}`
+                    `curl -s ${url} -m 5 --resolve ${host}:443:${ip} --resolve ${host}:80:${ip}`
                 )
                     .then(result => {
-                        if (String(result?.stdout).length > 200) {
-                            console.log(ip + ' is ok, time:' + (Date.now() - start))
+                        if (String(result?.stdout).length > 0) {
+                            console.log(`${ip} is ok, time: ${(Date.now() - start)}`)
                         } else {
-                            console.log(`${ip} is zero`)
+                            console.log(`${ip} is zero, time: ${(Date.now() - start)}`)
                         }
                     })
                     .catch(err => {
