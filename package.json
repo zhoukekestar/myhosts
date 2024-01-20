@@ -9,6 +9,10 @@
   "bin": {
     "myhosts": "./bin/myhosts.mjs"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhoukekestar/myhosts.git"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC"
