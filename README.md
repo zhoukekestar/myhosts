@@ -35,4 +35,10 @@ Testing...      22/22 100.00%
 All done!
 ```
 
+# 国内用户
 
+    如果国内用户 npx 太慢的话，可指定镜像执行。
+
+```sh
+$ npx --registry=https://registry.npmmirror.com myhosts https://github.com
+```
