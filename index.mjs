@@ -121,9 +121,10 @@ async function getIPs (dns, host) {
   await Promise.all(ipsPromises)
   console.log('\n✅ Resolve done.')
 
-  ips = Array.from(new Set(ips))
+  ips = Array.from(new Set(ips)).sort((a, b) => a.localeCompare(b))
 
   console.log(`IP number ${ips.length}.`)
+  console.log('IPs ' + JSON.stringify(ips, null, 2))
   return ips
 }
 
