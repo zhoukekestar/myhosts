@@ -30,15 +30,15 @@ async function getDNSList (args) {
     let list = []
     const urls = [
       'https://public-dns.info/nameserver/sg.json',
-      'https://public-dns.info/nameserver/cn.json',
+      // 'https://public-dns.info/nameserver/cn.json',
       'https://public-dns.info/nameserver/am.json',
       'https://public-dns.info/nameserver/jp.json',
-      'https://public-dns.info/nameserver/fr.json',
-      'https://public-dns.info/nameserver/it.json',
-      'https://public-dns.info/nameserver/ru.json',
-      'https://public-dns.info/nameserver/hk.json',
-      'https://public-dns.info/nameserver/in.json',
-      'https://public-dns.info/nameserver/au.json'
+      // 'https://public-dns.info/nameserver/fr.json',
+      // 'https://public-dns.info/nameserver/it.json',
+      // 'https://public-dns.info/nameserver/ru.json',
+      'https://public-dns.info/nameserver/hk.json'
+      // 'https://public-dns.info/nameserver/in.json',
+      // 'https://public-dns.info/nameserver/au.json'
     ]
     for (let i = 0; i < urls.length; i++) {
       list = list.concat(
@@ -75,8 +75,8 @@ async function getIPs (dns, host) {
   function outputResolve () {
     dnsResolvedCount++
     stdout.write(
-      `Resolving...\t${dnsResolvedCount}/${dns.length} ${(
-        (dnsResolvedCount / dns.length) *
+      `Resolving...\t${(dnsResolvedCount / 2).toFixed(0)}/${dns.length} ${(
+        ((dnsResolvedCount * 2) / dns.length) *
         100
       ).toFixed(2)}% \r`
     )
@@ -88,6 +88,7 @@ async function getIPs (dns, host) {
     resolver.setServers([dns[i]])
     outputPush()
 
+    // force to ipv4
     ipsPromises.push(
       resolver
         .resolve4(host)
@@ -102,6 +103,7 @@ async function getIPs (dns, host) {
         })
     )
 
+    // force to ipv6
     ipsPromises.push(
       resolver
         .resolve6(host)
@@ -124,7 +126,7 @@ async function getIPs (dns, host) {
   ips = Array.from(new Set(ips)).sort((a, b) => a.localeCompare(b))
 
   console.log(`IP number ${ips.length}.`)
-  console.log('IPs ' + JSON.stringify(ips, null, 2))
+  console.log('Resolved IPs ' + JSON.stringify(ips, null, 2))
   return ips
 }
 
