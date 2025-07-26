@@ -87,9 +87,24 @@ async function getIPs (dns, host) {
     const resolver = new Resolver({ timeout: 3000, tries: 3 })
     resolver.setServers([dns[i]])
     outputPush()
+
     ipsPromises.push(
       resolver
-        .resolve(host)
+        .resolve4(host)
+        .then(list => {
+          if (list && list.length > 0) {
+            ips = ips.concat(list)
+          }
+        })
+        .catch(err => {})
+        .finally(() => {
+          outputResolve()
+        })
+    )
+
+    ipsPromises.push(
+      resolver
+        .resolve6(host)
         .then(list => {
           if (list && list.length > 0) {
             ips = ips.concat(list)
@@ -156,7 +171,6 @@ async function curlTest (url, host, ips) {
             }
           })
           .catch(err => {
-            
             // console.log(`${ip} is error`)
           })
           .finally(() => {
